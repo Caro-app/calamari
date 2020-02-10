@@ -59,6 +59,11 @@ class VisCallback(keras.callbacks.Callback):
                                            pred_sentence, gt_sentence
                                            )
 
+            tf.summary.scalar('iter', self.checkpoint_params.iter, step=self.checkpoint_params.iter)            
+            tf.summary.scalar('dt', self.dt_stats.mean(), step=self.checkpoint_params.iter)
+            tf.summary.scalar('loss', data=self.loss_stats.mean(), step=self.checkpoint_params.iter)
+            tf.summary.scalar('cer', data=self.ler_stats.mean(), step=self.checkpoint_params.iter)
+
     def on_epoch_end(self, epoch, logs):
         pass
 
