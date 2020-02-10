@@ -23,6 +23,7 @@ setup(
             'calamari-cross-fold-train=calamari_ocr.scripts.cross_fold_train:main',
             'calamari-pred_to_json=calamari_ocr.scripts.cross_fold_train:main',
             'calamari-tensorflow-rename-variables=calamari_ocr.scripts.tensorflow_rename_variables:main',
+            'calamari-train-cfg=calamari_ocr.scripts.train_cfg:main'
         ],
     },
     python_requires='>=3.5',

@@ -9,3 +9,4 @@ h5py
 protobuf
 prettytable
 tensorflow
+yacs
