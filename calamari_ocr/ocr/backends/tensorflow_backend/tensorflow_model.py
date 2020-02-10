@@ -13,7 +13,6 @@ from tensorflow.python.ops import ctc_ops as ctc
 from .callbacks.visualize import VisCallback
 from .callbacks.earlystopping import EarlyStoppingCallback
 from .callbacks import TensorBoard
-from datetime import datetime
 
 keras = tf.keras
 K = keras.backend
@@ -323,8 +322,8 @@ class TensorflowModel(ModelInterface):
                                       0 if not validation_dataset else max(1, int(np.ceil(validation_dataset.epoch_size() / checkpoint_params.batch_size))),
                                       steps_per_epoch, v_cb, progress_bar)
 
-        logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
-        file_writer = tf.summary.create_file_writer(logdir + "/metrics")
+        logdir = "logs"
+        file_writer = tf.summary.create_file_writer(logdir + "/metrics", flush_millis=10000)
         file_writer.set_as_default()
         tb_cb = TensorBoard(log_dir=logdir, histogram_freq=1, write_graph=True, write_images=False, update_freq='batch')
 
