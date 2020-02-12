@@ -21,11 +21,6 @@ class VisCallback(keras.callbacks.Callback):
         self.ler_stats = RunningStatistics(checkpoint_params.stats_size, checkpoint_params.ler_stats)
         self.dt_stats = RunningStatistics(checkpoint_params.stats_size, checkpoint_params.dt_stats)
 
-        if self.val_data_gen is not None:
-            self.val_loss_stats = RunningStatistics(checkpoint_params.stats_size, checkpoint_params.loss_stats)
-            self.val_ler_stats = RunningStatistics(checkpoint_params.stats_size, checkpoint_params.ler_stats)
-            self.val_dt_stats = RunningStatistics(checkpoint_params.stats_size, checkpoint_params.dt_stats)
-
         display = checkpoint_params.display
         self.display_epochs = display <= 1
         if display <= 0:
@@ -51,8 +46,6 @@ class VisCallback(keras.callbacks.Callback):
         self.iter_start_time = time.time()
         self.dt_stats.push(dt)
         self.loss_stats.push(logs['loss'])
-        if self.val_data_gen is not None:
-            self.val_loss_stats.push(logs['val_loss'])
         self.checkpoint_params.iter += 1
 
         if self.display > 0 and self.checkpoint_params.iter % self.display == 0:
@@ -66,19 +59,18 @@ class VisCallback(keras.callbacks.Callback):
                                            self.checkpoint_params.iter, self.steps_per_epoch, self.display_epochs,
                                            pred_sentence, gt_sentence
                                            )
-            if self.val_data_gen is not None:
-                val_cer, _, _ = self._generate_val(1)
-                self.val_ler_stats.push(val_cer)
 
             tf.summary.scalar('iter', self.checkpoint_params.iter, step=self.checkpoint_params.iter)            
             tf.summary.scalar('dt', self.dt_stats.mean(), step=self.checkpoint_params.iter)
             tf.summary.scalar('train_loss', data=self.loss_stats.mean(), step=self.checkpoint_params.iter)
             tf.summary.scalar('train_cer', data=self.ler_stats.mean(), step=self.checkpoint_params.iter)
-            tf.summary.scalar('val_loss', data=self.val_loss_stats.mean(), step=self.checkpoint_params.iter)
-            tf.summary.scalar('val_cer', data=self.val_ler_stats.mean(), step=self.checkpoint_params.iter)
 
     def on_epoch_end(self, epoch, logs):
-        pass
+        if self.val_data_gen is not None:
+            if self.display > 0:
+                val_cer, _, _ = self._generate_val(min(len(self.val_data_gen), 1000))
+                tf.summary.scalar('val_loss', data=logs['val_loss'], step=self.checkpoint_params.iter)
+                tf.summary.scalar('val_cer', data=val_cer, step=self.checkpoint_params.iter)
 
     def _generate(self, count):
         it = iter(self.data_gen)
