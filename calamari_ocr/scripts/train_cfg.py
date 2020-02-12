@@ -209,7 +209,7 @@ def run(cfg: CfgNode):
                       preload_validation=not cfg.DATALOADER.VALID_ON_THE_FLY,
                       )
     trainer.train(
-        auto_compute_codec=not cfg.SEE_WHITELIST,
+        auto_compute_codec=not cfg.MODEL.CODEX.SEE_WHITELIST,
         progress_bar=not cfg.NO_PROGRESS_BAR
     )
 
