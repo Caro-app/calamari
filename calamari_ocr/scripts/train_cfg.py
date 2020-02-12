@@ -191,13 +191,18 @@ def run(cfg: CfgNode):
     params.model.network.backend.num_intra_threads = 0
     params.model.network.backend.shuffle_buffer_size = cfg.DATALOADER.SHUFFLE_BUFFER_SIZE
 
+    if cfg.MODEL.WEIGHTS is False:
+        weights = None
+    else:
+        weights = cfg.MODEL.WEIGHTS
+
     # create the actual trainer
     trainer = Trainer(params,
                       dataset,
                       validation_dataset=validation_dataset,
                       data_augmenter=SimpleDataAugmenter(),
                       n_augmentations=cfg.INPUT.N_AUGMENT,
-                      weights=cfg.MODEL.WEIGHTS,
+                      weights=weights,
                       codec_whitelist=whitelist,
                       keep_loaded_codec=cfg.MODEL.CODEX.KEEP_LOADED_CODEC,
                       preload_training=not cfg.DATALOADER.TRAIN_ON_THE_FLY,
