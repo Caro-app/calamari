@@ -68,7 +68,7 @@ class VisCallback(keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs):
         if self.val_data_gen is not None:
             if self.display > 0:
-                val_cer, _, _ = self._generate_val(min(len(self.val_data_gen), 1000))
+                val_cer, _, _ = self._generate_val(20) # 20 batches for generating validation metrics
                 tf.summary.scalar('val_loss', data=logs['val_loss'], step=self.checkpoint_params.iter)
                 tf.summary.scalar('val_cer', data=val_cer, step=self.checkpoint_params.iter)
 

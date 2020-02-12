@@ -327,7 +327,7 @@ class TensorflowModel(ModelInterface):
         tb_path = os.path.join(checkpoint_params.output_dir, 'metrics')
         file_writer = tf.summary.create_file_writer(tb_path , flush_millis=10000)
         file_writer.set_as_default()
-        tb_cb = TensorBoard(log_dir=checkpoint_params.output_dir, histogram_freq=1, write_graph=True, write_images=False, update_freq='batch')
+        tb_cb = TensorBoard(log_dir=tb_path, histogram_freq=1, write_graph=True, write_images=False, update_freq='batch')
 
         self.model.fit(
             dataset_gen,
