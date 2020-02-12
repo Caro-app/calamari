@@ -191,7 +191,7 @@ def run(cfg: CfgNode):
     params.model.network.backend.num_intra_threads = 0
     params.model.network.backend.shuffle_buffer_size = cfg.DATALOADER.SHUFFLE_BUFFER_SIZE
 
-    if cfg.MODEL.WEIGHTS is False:
+    if cfg.MODEL.WEIGHTS == "":
         weights = None
     else:
         weights = cfg.MODEL.WEIGHTS
