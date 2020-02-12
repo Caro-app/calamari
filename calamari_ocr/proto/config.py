@@ -48,7 +48,7 @@ _C.DATASET = CfgNode()
 # List all image files that shall be processed. Ground truth fils with the same 
 # base name but with '.gt.txt' as extension are required at the same location
 _C.DATASET.TRAIN = CfgNode()
-_C.DATASET.TRAIN.PATH = ''
+_C.DATASET.TRAIN.PATH = []
 # Optional list of GT files if they are in other directory
 _C.DATASET.TRAIN.TEXT_FILES = False
 # Default extension of the gt files (expected to exist in same dir)
@@ -58,7 +58,7 @@ _C.DATASET.TRAIN.TYPE = 1
 
 _C.DATASET.VALID = CfgNode()
 # Validation line files used for early stopping
-_C.DATASET.VALID.PATH = False
+_C.DATASET.VALID.PATH = []
 # Optional list of GT files if they are in other directory
 _C.DATASET.VALID.TEXT_FILES = False
 # Default extension of the gt files (expected to exist in same dir)

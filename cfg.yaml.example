@@ -7,12 +7,12 @@ DATALOADER:
 DATASET:
   TRAIN:
     GT_EXTENSION: false
-    PATH: ''
+    PATH: []
     TEXT_FILES: false
     TYPE: 1
   VALID:
     GT_EXTENSION: false
-    PATH: false
+    PATH: []
     TEXT_FILES: false
     TYPE: 1
 DISPLAY: 100
