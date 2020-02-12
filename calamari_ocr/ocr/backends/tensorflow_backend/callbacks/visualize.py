@@ -7,7 +7,7 @@ keras = tf.keras
 
 
 class VisCallback(keras.callbacks.Callback):
-    def __init__(self, training_callback, codec, data_gen, predict_func, checkpoint_params, steps_per_epoch, text_post_proc):
+    def __init__(self, training_callback, codec, data_gen, predict_func, checkpoint_params, steps_per_epoch, text_post_proc, val_data_gen=None):
         self.training_callback = training_callback
         self.codec = codec
         self.data_gen = data_gen
@@ -15,10 +15,16 @@ class VisCallback(keras.callbacks.Callback):
         self.checkpoint_params = checkpoint_params
         self.steps_per_epoch = steps_per_epoch
         self.text_post_proc = text_post_proc
+        self.val_data_gen = val_data_gen
 
         self.loss_stats = RunningStatistics(checkpoint_params.stats_size, checkpoint_params.loss_stats)
         self.ler_stats = RunningStatistics(checkpoint_params.stats_size, checkpoint_params.ler_stats)
         self.dt_stats = RunningStatistics(checkpoint_params.stats_size, checkpoint_params.dt_stats)
+
+        if self.val_data_gen is not None:
+            self.val_loss_stats = RunningStatistics(checkpoint_params.stats_size, checkpoint_params.loss_stats)
+            self.val_ler_stats = RunningStatistics(checkpoint_params.stats_size, checkpoint_params.ler_stats)
+            self.val_dt_stats = RunningStatistics(checkpoint_params.stats_size, checkpoint_params.dt_stats)
 
         display = checkpoint_params.display
         self.display_epochs = display <= 1
@@ -45,6 +51,8 @@ class VisCallback(keras.callbacks.Callback):
         self.iter_start_time = time.time()
         self.dt_stats.push(dt)
         self.loss_stats.push(logs['loss'])
+        if self.val_data_gen is not None:
+            self.val_loss_stats.push(logs['val_loss'])
         self.checkpoint_params.iter += 1
 
         if self.display > 0 and self.checkpoint_params.iter % self.display == 0:
@@ -58,11 +66,16 @@ class VisCallback(keras.callbacks.Callback):
                                            self.checkpoint_params.iter, self.steps_per_epoch, self.display_epochs,
                                            pred_sentence, gt_sentence
                                            )
+            if self.val_data_gen is not None:
+                val_cer, _, _ = self._generate_val(1)
+                self.val_ler_stats.push(val_cer)
 
             tf.summary.scalar('iter', self.checkpoint_params.iter, step=self.checkpoint_params.iter)            
             tf.summary.scalar('dt', self.dt_stats.mean(), step=self.checkpoint_params.iter)
-            tf.summary.scalar('loss', data=self.loss_stats.mean(), step=self.checkpoint_params.iter)
-            tf.summary.scalar('cer', data=self.ler_stats.mean(), step=self.checkpoint_params.iter)
+            tf.summary.scalar('train_loss', data=self.loss_stats.mean(), step=self.checkpoint_params.iter)
+            tf.summary.scalar('train_cer', data=self.ler_stats.mean(), step=self.checkpoint_params.iter)
+            tf.summary.scalar('val_loss', data=self.val_loss_stats.mean(), step=self.checkpoint_params.iter)
+            tf.summary.scalar('val_cer', data=self.val_ler_stats.mean(), step=self.checkpoint_params.iter)
 
     def on_epoch_end(self, epoch, logs):
         pass
@@ -71,3 +84,11 @@ class VisCallback(keras.callbacks.Callback):
         it = iter(self.data_gen)
         cer, target, decoded = zip(*[self.predict_func(next(it)) for _ in range(count)])
         return np.mean(cer), sum(map(sparse_to_lists, target), []), sum(map(sparse_to_lists, decoded), [])
+
+    def _generate_val(self, count):
+        if self.val_data_gen is None:
+            pass
+        else:
+            it = iter(self.val_data_gen)
+            cer, target, decoded = zip(*[self.predict_func(next(it)) for _ in range(count)])
+            return np.mean(cer), sum(map(sparse_to_lists, target), []), sum(map(sparse_to_lists, decoded), [])
