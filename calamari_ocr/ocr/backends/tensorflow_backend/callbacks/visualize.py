@@ -7,7 +7,17 @@ keras = tf.keras
 
 
 class VisCallback(keras.callbacks.Callback):
-    def __init__(self, training_callback, codec, data_gen, val_data_gen, predict_func, checkpoint_params, steps_per_epoch, text_post_proc):
+    def __init__(self, 
+                 training_callback, 
+                 codec, 
+                 data_gen, 
+                 val_data_gen, 
+                 predict_func, 
+                 checkpoint_params, 
+                 steps_per_epoch, 
+                 text_post_proc,
+                 train_summary_writer,
+                 test_summary_writer):
         self.training_callback = training_callback
         self.codec = codec
         self.data_gen = data_gen
@@ -16,6 +26,9 @@ class VisCallback(keras.callbacks.Callback):
         self.steps_per_epoch = steps_per_epoch
         self.text_post_proc = text_post_proc
         self.val_data_gen = val_data_gen
+
+        self.train_summary_writer = train_summary_writer
+        self.test_summary_writer = test_summary_writer
 
         self.loss_stats = RunningStatistics(checkpoint_params.stats_size, checkpoint_params.loss_stats)
         self.ler_stats = RunningStatistics(checkpoint_params.stats_size, checkpoint_params.ler_stats)
@@ -59,18 +72,22 @@ class VisCallback(keras.callbacks.Callback):
                                            self.checkpoint_params.iter, self.steps_per_epoch, self.display_epochs,
                                            pred_sentence, gt_sentence
                                            )
-
-            tf.summary.scalar('iter', self.checkpoint_params.iter, step=self.checkpoint_params.iter)            
-            tf.summary.scalar('dt', self.dt_stats.mean(), step=self.checkpoint_params.iter)
-            tf.summary.scalar('train_loss', data=self.loss_stats.mean(), step=self.checkpoint_params.iter)
-            tf.summary.scalar('train_cer', data=self.ler_stats.mean(), step=self.checkpoint_params.iter)
+            with self.train_summary_writer.as_default():
+                tf.summary.scalar('iter', self.checkpoint_params.iter, step=self.checkpoint_params.iter)            
+                tf.summary.scalar('dt', self.dt_stats.mean(), step=self.checkpoint_params.iter)
+                tf.summary.scalar('train_batch_loss', data=self.loss_stats.mean(), step=self.checkpoint_params.iter)
+                tf.summary.scalar('train_batch_cer', data=self.ler_stats.mean(), step=self.checkpoint_params.iter)
 
     def on_epoch_end(self, epoch, logs):
+        with self.train_summary_writer.as_default():
+            tf.summary.scalar('train_epoch_loss', data=logs['loss'], step=epoch)
+        
         if self.val_data_gen is not None:
             if self.display > 0:
                 val_cer, _, _ = self._generate_val(20) # 20 batches for generating validation metrics
-                tf.summary.scalar('val_loss', data=logs['val_loss'], step=self.checkpoint_params.iter)
-                tf.summary.scalar('val_cer', data=val_cer, step=self.checkpoint_params.iter)
+                with self.test_summary_writer.as_default():
+                    tf.summary.scalar('val_epoch_loss', data=logs['val_loss'], step=epoch)
+                    tf.summary.scalar('val_cer', data=val_cer, step=epoch)
 
     def _generate(self, count):
         it = iter(self.data_gen)

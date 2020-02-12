@@ -318,16 +318,25 @@ class TensorflowModel(ModelInterface):
 
         predict_func = K.function({t.op.name: t for t in [self.input_data, self.input_length, self.input_params, self.targets, self.targets_length]}, [self.cer, self.sparse_targets, self.sparse_decoded])
         steps_per_epoch = max(1, int(dataset.epoch_size() / checkpoint_params.batch_size))
-        v_cb = VisCallback(training_callback, self.codec, dataset_gen, val_dataset_gen, predict_func, checkpoint_params, steps_per_epoch, text_post_proc)
+
+        tb_train_path = os.path.join(checkpoint_params.output_dir, 'train')
+        tb_valid_path = os.path.join(checkpoint_params.output_dir, 'valid')
+        train_summary_writer = tf.summary.create_file_writer(tb_train_path)
+        test_summary_writer = tf.summary.create_file_writer(tb_valid_path)
+
+        v_cb = VisCallback(training_callback,
+                           self.codec, 
+                           dataset_gen, 
+                           val_dataset_gen, 
+                           predict_func, 
+                           checkpoint_params, 
+                           steps_per_epoch, 
+                           text_post_proc, 
+                           train_summary_writer, 
+                           test_summary_writer)
         es_cb = EarlyStoppingCallback(training_callback, self.codec, val_dataset_gen, predict_func, checkpoint_params,
                                       0 if not validation_dataset else max(1, int(np.ceil(validation_dataset.epoch_size() / checkpoint_params.batch_size))),
                                       steps_per_epoch, v_cb, progress_bar)
-
-        
-        tb_path = os.path.join(checkpoint_params.output_dir, 'metrics')
-        file_writer = tf.summary.create_file_writer(tb_path , flush_millis=10000)
-        file_writer.set_as_default()
-        tb_cb = TensorBoard(log_dir=tb_path, histogram_freq=1, write_graph=True, write_images=False, update_freq='batch')
 
         self.model.fit(
             dataset_gen,
@@ -338,7 +347,7 @@ class TensorflowModel(ModelInterface):
             verbose=0,
             validation_data=val_dataset_gen,
             callbacks=[
-                v_cb, es_cb, tb_cb
+                v_cb, es_cb
             ]
         )
 
