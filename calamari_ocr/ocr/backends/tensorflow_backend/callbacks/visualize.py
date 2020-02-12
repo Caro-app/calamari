@@ -7,7 +7,7 @@ keras = tf.keras
 
 
 class VisCallback(keras.callbacks.Callback):
-    def __init__(self, training_callback, codec, data_gen, predict_func, checkpoint_params, steps_per_epoch, text_post_proc, val_data_gen=None):
+    def __init__(self, training_callback, codec, data_gen, val_data_gen, predict_func, checkpoint_params, steps_per_epoch, text_post_proc):
         self.training_callback = training_callback
         self.codec = codec
         self.data_gen = data_gen
