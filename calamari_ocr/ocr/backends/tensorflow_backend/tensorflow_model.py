@@ -336,6 +336,7 @@ class TensorflowModel(ModelInterface):
             use_multiprocessing=False,
             shuffle=False,
             verbose=0,
+            validation_data=val_dataset_gen,
             callbacks=[
                 v_cb, es_cb, tb_cb
             ]
