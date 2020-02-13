@@ -102,6 +102,8 @@ _C.MODEL.CODEX.WHITELIST = []
 _C.MODEL.CODEX.KEEP_LOADED_CODEC = False
 
 _C.SOLVER = CfgNode()
+#  Learning rate
+_C.SOLVER.LR = 0.001
 # The batch size to use for training
 _C.SOLVER.BATCH_SIZE = 5
 # The number of iterations for training. 

@@ -184,7 +184,7 @@ def run(cfg: CfgNode):
         bidi_processor_params.bidi_direction = TextProcessorParams.BIDI_AUTO
 
     params.model.line_height = cfg.INPUT.LINE_HEIGHT
-
+    params.model.network.learning_rate = cfg.SOLVER.LR
     network_params_from_definition_string(cfg.MODEL.NETWORK, params.model.network)
     params.model.network.clipping_norm = cfg.SOLVER.GRADIENT_CLIPPING_NORM
     params.model.network.backend.num_inter_threads = 0

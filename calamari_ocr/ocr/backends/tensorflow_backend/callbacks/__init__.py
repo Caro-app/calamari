@@ -1,1 +1,1 @@
-from tensorflow.keras.callbacks import TensorBoard
+from calamari_ocr.ocr.backends.tensorflow_backend.callbacks.custom_tb import CustomTensorBoard

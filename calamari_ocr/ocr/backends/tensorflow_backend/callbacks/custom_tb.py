@@ -1,3 +1,5 @@
+import tensorflow as tf
+from tensorflow.keras.callbacks import TensorBoard
 from calamari_ocr.utils import RunningStatistics
 from ..util import sparse_to_lists
 import numpy as np
@@ -6,29 +8,45 @@ import time
 keras = tf.keras
 
 
-class VisCallback(keras.callbacks.Callback):
+
+class CustomTensorBoard(TensorBoard):
+
+
     def __init__(self, 
                  training_callback, 
                  codec, 
-                 data_gen, 
-                 val_data_gen, 
+                 train_data_gen, 
+                 validation_data_gen, 
                  predict_func, 
                  checkpoint_params, 
                  steps_per_epoch, 
                  text_post_proc,
-                 train_summary_writer,
-                 test_summary_writer):
+                 log_dir='logs',
+                 histogram_freq=0,
+                 write_graph=True,
+                 write_images=False,
+                 update_freq='epoch',
+                 embeddings_freq=0,
+                 embeddings_metadata=None,
+                 **kwargs):
+        
+        super().__init__(
+                       log_dir=log_dir,
+                       histogram_freq=histogram_freq,
+                       write_graph=write_graph,
+                       write_images=write_images,
+                       update_freq=update_freq,
+                       embeddings_freq=embeddings_freq,
+                       embeddings_metadata=embeddings_metadata,
+                       **kwargs)
         self.training_callback = training_callback
         self.codec = codec
-        self.data_gen = data_gen
+        self.train_data_gen = train_data_gen
+        self.validation_data_gen = validation_data_gen
         self.predict_func = predict_func
         self.checkpoint_params = checkpoint_params
         self.steps_per_epoch = steps_per_epoch
         self.text_post_proc = text_post_proc
-        self.val_data_gen = val_data_gen
-
-        self.train_summary_writer = train_summary_writer
-        self.test_summary_writer = test_summary_writer
 
         self.loss_stats = RunningStatistics(checkpoint_params.stats_size, checkpoint_params.loss_stats)
         self.ler_stats = RunningStatistics(checkpoint_params.stats_size, checkpoint_params.ler_stats)
@@ -48,13 +66,19 @@ class VisCallback(keras.callbacks.Callback):
         self.train_start_time = time.time()
 
     def on_train_begin(self, logs):
+        super().on_train_begin(logs)
+        
         self.iter_start_time = time.time()
         self.train_start_time = time.time()
 
     def on_train_end(self, logs):
+        super().on_train_end(logs)
+
         self.training_callback.training_finished(time.time() - self.train_start_time, self.checkpoint_params.iter)
 
-    def on_batch_end(self, batch, logs):
+    def on_batch_end(self, batch, logs=None):
+        super().on_epoch_end(batch, logs)
+
         dt = time.time() - self.iter_start_time
         self.iter_start_time = time.time()
         self.dt_stats.push(dt)
@@ -63,7 +87,7 @@ class VisCallback(keras.callbacks.Callback):
 
         if self.display > 0 and self.checkpoint_params.iter % self.display == 0:
             # apply postprocessing to display the true output
-            cer, target, decoded = self._generate(1)
+            cer, target, decoded = self._generate(self.train_data_gen, 1)
             self.ler_stats.push(cer)
             pred_sentence = self.text_post_proc.apply("".join(self.codec.decode(decoded[0])))
             gt_sentence = self.text_post_proc.apply("".join(self.codec.decode(target[0])))
@@ -72,32 +96,26 @@ class VisCallback(keras.callbacks.Callback):
                                            self.checkpoint_params.iter, self.steps_per_epoch, self.display_epochs,
                                            pred_sentence, gt_sentence
                                            )
-            with self.train_summary_writer.as_default():
-                tf.summary.scalar('iter', self.checkpoint_params.iter, step=self.checkpoint_params.iter)            
-                tf.summary.scalar('dt', self.dt_stats.mean(), step=self.checkpoint_params.iter)
-                tf.summary.scalar('train_batch_loss', data=self.loss_stats.mean(), step=self.checkpoint_params.iter)
-                tf.summary.scalar('train_batch_cer', data=self.ler_stats.mean(), step=self.checkpoint_params.iter)
+            tf.summary.scalar('iter', self.checkpoint_params.iter, step=self.checkpoint_params.iter)            
+            tf.summary.scalar('dt', self.dt_stats.mean(), step=self.checkpoint_params.iter)
+            tf.summary.scalar('train/batch_loss', data=self.loss_stats.mean(), step=self.checkpoint_params.iter)
+            tf.summary.scalar('train/batch_cer', data=self.ler_stats.mean(), step=self.checkpoint_params.iter)
 
-    def on_epoch_end(self, epoch, logs):
-        with self.train_summary_writer.as_default():
-            tf.summary.scalar('train_epoch_loss', data=logs['loss'], step=epoch)
+
+    def on_epoch_end(self, epoch, logs=None):
+        super().on_epoch_end(epoch, logs)
+        tf.summary.scalar('train/epoch_loss', data=logs['loss'], step=epoch)
         
-        if self.val_data_gen is not None:
+        if self.validation_data_gen is not None:
             if self.display > 0:
-                val_cer, _, _ = self._generate_val(20) # 20 batches for generating validation metrics
-                with self.test_summary_writer.as_default():
-                    tf.summary.scalar('val_epoch_loss', data=logs['val_loss'], step=epoch)
-                    tf.summary.scalar('val_cer', data=val_cer, step=epoch)
+                val_cer, _, _ = self._generate(self.validation_data_gen, 20) # 20 batches for generating validation metrics
+                tf.summary.scalar('valid/epoch_loss', data=logs['val_loss'], step=epoch)
+                tf.summary.scalar('valid/cer', data=val_cer, step=epoch)
 
-    def _generate(self, count):
-        it = iter(self.data_gen)
-        cer, target, decoded = zip(*[self.predict_func(next(it)) for _ in range(count)])
-        return np.mean(cer), sum(map(sparse_to_lists, target), []), sum(map(sparse_to_lists, decoded), [])
-
-    def _generate_val(self, count):
-        if self.val_data_gen is None:
+    def _generate(self, data_gen, count):
+        if data_gen is None:
             pass
         else:
-            it = iter(self.val_data_gen)
+            it = iter(data_gen)
             cer, target, decoded = zip(*[self.predict_func(next(it)) for _ in range(count)])
             return np.mean(cer), sum(map(sparse_to_lists, target), []), sum(map(sparse_to_lists, decoded), [])
