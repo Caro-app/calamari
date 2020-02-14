@@ -328,6 +328,7 @@ class TensorflowModel(ModelInterface):
                                  text_post_proc,
                                  histogram_freq=1,
                                  profile_batch=0,
+                                 update_freq='batch',
                                  log_dir=os.path.join(checkpoint_params.output_dir)
                                  )
         es_cb = EarlyStoppingCallback(training_callback, self.codec, val_dataset_gen, predict_func, checkpoint_params,

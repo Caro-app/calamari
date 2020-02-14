@@ -5,6 +5,8 @@ from ..util import sparse_to_lists
 import numpy as np
 import tensorflow as tf
 import time
+from tensorflow.python.eager import context
+from tensorflow.python.ops import math_ops
 keras = tf.keras
 
 
@@ -76,41 +78,57 @@ class CustomTensorBoard(TensorBoard):
 
         self.training_callback.training_finished(time.time() - self.train_start_time, self.checkpoint_params.iter)
 
-    def on_batch_end(self, batch, logs=None):
-        super().on_epoch_end(batch, logs)
+    def on_train_batch_end(self, batch, logs=None):        
+        self.checkpoint_params.iter += 1
+
+        if self.update_freq == 'epoch' and self._profile_batch is None:
+            return
 
         dt = time.time() - self.iter_start_time
         self.iter_start_time = time.time()
         self.dt_stats.push(dt)
         self.loss_stats.push(logs['loss'])
-        self.checkpoint_params.iter += 1
 
-        if self.display > 0 and self.checkpoint_params.iter % self.display == 0:
-            # apply postprocessing to display the true output
+        logs = logs or {}
+        if self.update_freq != 'epoch' and batch % self.update_freq == 0:            
             cer, target, decoded = self._generate(self.train_data_gen, 1)
             self.ler_stats.push(cer)
             pred_sentence = self.text_post_proc.apply("".join(self.codec.decode(decoded[0])))
             gt_sentence = self.text_post_proc.apply("".join(self.codec.decode(target[0])))
+            self._log_metrics({"loss": self.loss_stats.mean()}, prefix='batch_', step=self.checkpoint_params.iter)
+            self._log_metrics({"cer": self.ler_stats.mean()}, prefix='batch_', step=self.checkpoint_params.iter)
 
-            self.training_callback.display(self.ler_stats.mean(), self.loss_stats.mean(), self.dt_stats.mean(),
-                                           self.checkpoint_params.iter, self.steps_per_epoch, self.display_epochs,
-                                           pred_sentence, gt_sentence
-                                           )
-            tf.summary.scalar('iter', self.checkpoint_params.iter, step=self.checkpoint_params.iter)            
-            tf.summary.scalar('dt', self.dt_stats.mean(), step=self.checkpoint_params.iter)
-            tf.summary.scalar('train/batch_loss', data=self.loss_stats.mean(), step=self.checkpoint_params.iter)
-            tf.summary.scalar('train/batch_cer', data=self.ler_stats.mean(), step=self.checkpoint_params.iter)
+            if self.display > 0 and self.checkpoint_params.iter % self.display == 0:
+                self.training_callback.display(self.ler_stats.mean(), self.loss_stats.mean(), self.dt_stats.mean(),
+                                            self.checkpoint_params.iter, self.steps_per_epoch, self.display_epochs,
+                                            pred_sentence, gt_sentence
+                                            )
+        self._increment_step(self._train_run_name)
+
+        if context.executing_eagerly():
+            if self._is_tracing:
+                self._log_trace()
+            elif (not self._is_tracing and
+                    math_ops.equal(self.checkpoint_params.iter, self._profile_batch - 1)):
+                self._enable_trace()
 
 
     def on_epoch_end(self, epoch, logs=None):
-        super().on_epoch_end(epoch, logs)
-        tf.summary.scalar('train/epoch_loss', data=logs['loss'], step=epoch)
-        
+        self._log_metrics(logs, prefix='epoch_', step=epoch)
+
+        if self.histogram_freq and epoch % self.histogram_freq == 0:
+            self._log_weights(epoch)
+
+        if self.embeddings_freq and epoch % self.embeddings_freq == 0:
+            self._log_embeddings(epoch)
+
+        if self.update_freq == 'epoch':
+            train_cer, _, _ = self._generate(self.train_data_gen, 20) # 20 batches for generating training metrics
+            self._log_metrics({"cer": train_cer}, prefix='train_', step=epoch)
+
         if self.validation_data_gen is not None:
-            if self.display > 0:
-                val_cer, _, _ = self._generate(self.validation_data_gen, 20) # 20 batches for generating validation metrics
-                tf.summary.scalar('valid/epoch_loss', data=logs['val_loss'], step=epoch)
-                tf.summary.scalar('valid/cer', data=val_cer, step=epoch)
+            val_cer, _, _ = self._generate(self.validation_data_gen, 20) # 20 batches for generating validation metrics
+            self._log_metrics({"cer": val_cer}, prefix='validation_', step=epoch)
 
     def _generate(self, data_gen, count):
         if data_gen is None:
