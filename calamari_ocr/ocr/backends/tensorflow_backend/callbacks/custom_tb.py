@@ -79,6 +79,7 @@ class CustomTensorBoard(TensorBoard):
         self.training_callback.training_finished(time.time() - self.train_start_time, self.checkpoint_params.iter)
 
     def on_train_batch_end(self, batch, logs=None):        
+        assert self._total_batches_seen[self._train_run_name] == self.checkpoint_params.iter
         self.checkpoint_params.iter += 1
 
         if self.update_freq == 'epoch' and self._profile_batch is None:
@@ -90,7 +91,7 @@ class CustomTensorBoard(TensorBoard):
         self.loss_stats.push(logs['loss'])
 
         logs = logs or {}
-        if self.update_freq != 'epoch' and batch % self.update_freq == 0:            
+        if self.update_freq != 'epoch' and self.display > 0 and self.checkpoint_params.iter % self.display == 0:            
             cer, target, decoded = self._generate(self.train_data_gen, 1)
             self.ler_stats.push(cer)
             pred_sentence = self.text_post_proc.apply("".join(self.codec.decode(decoded[0])))
@@ -98,12 +99,12 @@ class CustomTensorBoard(TensorBoard):
             self._log_metrics({"loss": self.loss_stats.mean()}, prefix='batch_', step=self.checkpoint_params.iter)
             self._log_metrics({"cer": self.ler_stats.mean()}, prefix='batch_', step=self.checkpoint_params.iter)
 
-            if self.display > 0 and self.checkpoint_params.iter % self.display == 0:
-                self.training_callback.display(self.ler_stats.mean(), self.loss_stats.mean(), self.dt_stats.mean(),
-                                            self.checkpoint_params.iter, self.steps_per_epoch, self.display_epochs,
-                                            pred_sentence, gt_sentence
-                                            )
+            self.training_callback.display(self.ler_stats.mean(), self.loss_stats.mean(), self.dt_stats.mean(),
+                                        self.checkpoint_params.iter, self.steps_per_epoch, self.display_epochs,
+                                        pred_sentence, gt_sentence
+                                        )
         self._increment_step(self._train_run_name)
+
 
         if context.executing_eagerly():
             if self._is_tracing:
