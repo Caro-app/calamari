@@ -79,13 +79,7 @@ class CustomTensorBoard(TensorBoard):
         self.training_callback.training_finished(time.time() - self.train_start_time, self.checkpoint_params.iter)
 
     def on_train_batch_end(self, batch, logs=None):        
-        # for version compatibility
-        if tf.__version__ == '2.1.0':
-            assert self._total_batches_seen[self._train_run_name] == self.checkpoint_params.iter
-        elif tf.__version__ == '2.0.0':
-            assert self._total_batches_seen == self.checkpoint_params.iter
-        else:
-            pass
+        assert self._total_batches_seen == self.checkpoint_params.iter
 
         self.checkpoint_params.iter += 1
 
@@ -110,8 +104,7 @@ class CustomTensorBoard(TensorBoard):
                                         self.checkpoint_params.iter, self.steps_per_epoch, self.display_epochs,
                                         pred_sentence, gt_sentence
                                         )
-        self._increment_step(self._train_run_name)
-
+        self._total_batches_seen += 1
 
         if context.executing_eagerly():
             if self._is_tracing:
