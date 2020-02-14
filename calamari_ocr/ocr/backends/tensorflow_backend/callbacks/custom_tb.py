@@ -79,7 +79,14 @@ class CustomTensorBoard(TensorBoard):
         self.training_callback.training_finished(time.time() - self.train_start_time, self.checkpoint_params.iter)
 
     def on_train_batch_end(self, batch, logs=None):        
-        assert self._total_batches_seen[self._train_run_name] == self.checkpoint_params.iter
+        # for version compatibility
+        if tf.__version__ == '2.1.0':
+            assert self._total_batches_seen[self._train_run_name] == self.checkpoint_params.iter
+        elif tf.__version__ == '2.0.0':
+            assert self._total_batches_seen == self.checkpoint_params.iter
+        else:
+            pass
+
         self.checkpoint_params.iter += 1
 
         if self.update_freq == 'epoch' and self._profile_batch is None:
