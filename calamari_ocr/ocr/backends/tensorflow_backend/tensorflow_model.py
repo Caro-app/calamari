@@ -326,7 +326,7 @@ class TensorflowModel(ModelInterface):
                                  checkpoint_params, 
                                  steps_per_epoch, 
                                  text_post_proc,
-                                 histogram_freq=5,
+                                 histogram_freq=1,
                                  profile_batch=0,
                                  update_freq='batch',
                                  log_dir=os.path.join(checkpoint_params.output_dir)

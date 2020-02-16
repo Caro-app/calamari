@@ -104,6 +104,11 @@ class CustomTensorBoard(TensorBoard):
                                         self.checkpoint_params.iter, self.steps_per_epoch, self.display_epochs,
                                         pred_sentence, gt_sentence
                                         )
+
+            if self.validation_data_gen is not None:
+                val_cer, _, _ = self._generate(self.validation_data_gen, 20) # 20 batches for generating validation metrics
+                self._log_metrics({"cer": val_cer}, prefix='validation_', step=self.checkpoint_params.iter)
+
         self._total_batches_seen += 1
 
         if context.executing_eagerly():
@@ -127,9 +132,9 @@ class CustomTensorBoard(TensorBoard):
             train_cer, _, _ = self._generate(self.train_data_gen, 20) # 20 batches for generating training metrics
             self._log_metrics({"cer": train_cer}, prefix='train_', step=epoch)
 
-        if self.validation_data_gen is not None:
-            val_cer, _, _ = self._generate(self.validation_data_gen, 20) # 20 batches for generating validation metrics
-            self._log_metrics({"cer": val_cer}, prefix='validation_', step=epoch)
+            if self.validation_data_gen is not None:
+                val_cer, _, _ = self._generate(self.validation_data_gen, 20) # 20 batches for generating validation metrics
+                self._log_metrics({"cer": val_cer}, prefix='validation_', step=epoch)
 
     def _generate(self, data_gen, count):
         if data_gen is None:
