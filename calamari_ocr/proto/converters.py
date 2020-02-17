@@ -16,7 +16,6 @@ def set_default_network_params(params):
     params.dropout = 0
     params.ctc_merge_repeated = True
     params.backend.cudnn = True
-    params.learning_rate = 1e-3
 
 
 def network_params_from_definition_string(str, params):
@@ -30,13 +29,11 @@ def network_params_from_definition_string(str, params):
     for param in str_params:
         label, value = tuple(param.split("="))
         flags = ["ctc_merge_repeated", "cudnn"]
-        floats = ["learning_rate", "momentum", "dropout"]
+        floats = ["momentum", "dropout"]
         if label in flags:
             setattr(params, label, value.lower() == "true")
         elif label == "ctc":
             setattr(params, label, NetworkParams.CTCType.Value(value))
-        elif label == "l_rate":
-            params.learning_rate = float(value)
         elif label in floats:
             setattr(params, label, float(value))
         elif label == "solver":

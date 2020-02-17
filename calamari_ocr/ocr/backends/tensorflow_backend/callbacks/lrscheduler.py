@@ -24,17 +24,17 @@ class LearningRateScheduler(Callback):
         if not hasattr(self.model.optimizer, 'lr'):
             raise ValueError('Optimizer must have a "lr" attribute.')
         try:  # new API
-            lr = float(K.get_value(self.model.optimizer.lr))
-            lr = self.schedule(self._total_batches_seen_lr, lr)
+            lr_o = float(K.get_value(self.model.optimizer.lr))
+            lr = self.schedule(self._total_batches_seen_lr, lr_o)
         except TypeError:  # Support for old API for backward compatibility
-            lr = self.schedule(self._total_batches_seen_lr)
+            raise TypeError('The schedule function accepts two arguments - iteratnion and last learning rate')
         if not isinstance(lr, (ops.Tensor, float, np.float32, np.float64)):
             raise ValueError('The output of the "schedule" function '
                             'should be float.')
         if isinstance(lr, ops.Tensor) and not lr.dtype.is_floating:
             raise ValueError('The dtype of Tensor should be float')
         K.set_value(self.model.optimizer.lr, K.get_value(lr))
-        if self.verbose > 0:
+        if self.verbose > 0 and lr_o != lr:
             print('\nIteration %05d: LearningRateScheduler reducing learning '
                     'rate to %s.' % (self._total_batches_seen_lr + 1, lr))
 
