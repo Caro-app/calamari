@@ -11,7 +11,7 @@ from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import ctc_ops as ctc
 from .callbacks.earlystopping import EarlyStoppingCallback
-from .callbacks import CustomTensorBoard
+from .callbacks import CustomTensorBoard,  LearningRateScheduler
 import os
 
 keras = tf.keras
@@ -318,6 +318,18 @@ class TensorflowModel(ModelInterface):
         predict_func = K.function({t.op.name: t for t in [self.input_data, self.input_length, self.input_params, self.targets, self.targets_length]}, [self.cer, self.sparse_targets, self.sparse_decoded])
         steps_per_epoch = max(1, int(dataset.epoch_size() / checkpoint_params.batch_size))
 
+
+        def lr_schedule(iteration, lr):
+            if checkpoint_params.model.network.lr_decay_freq != 0:
+                if iteration != 0 and iteration % checkpoint_params.model.network.lr_decay_freq == 0:
+                    return lr * checkpoint_params.model.network.lr_decay
+                else:
+                    return lr
+            else:
+                return lr
+
+        lrs_cb = LearningRateScheduler(lr_schedule, verbose=1)
+
         ctb_cb = CustomTensorBoard(training_callback,
                                  self.codec, 
                                  dataset_gen, 
@@ -344,7 +356,7 @@ class TensorflowModel(ModelInterface):
             verbose=0,
             validation_data=val_dataset_gen,
             callbacks=[
-                ctb_cb, es_cb
+                lrs_cb, ctb_cb, es_cb
             ]
         )
 

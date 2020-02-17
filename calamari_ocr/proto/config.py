@@ -102,8 +102,13 @@ _C.MODEL.CODEX.WHITELIST = []
 _C.MODEL.CODEX.KEEP_LOADED_CODEC = False
 
 _C.SOLVER = CfgNode()
-#  Learning rate
+# Learning rate
 _C.SOLVER.LR = 0.001
+# Learning rate decay
+_C.SOLVER.LR_DECAY = 0.99
+# Learning rate decay every N batch. 
+# If FREQ set to 0, no decay.
+_C.SOLVER.LR_DECAY_FREQ = 1000
 # The batch size to use for training
 _C.SOLVER.BATCH_SIZE = 5
 # The number of iterations for training. 

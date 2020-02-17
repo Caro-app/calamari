@@ -113,6 +113,8 @@ message NetworkParams {
     repeated LayerParams layers = 1;
     SolverType solver = 2;
     float learning_rate = 11;
+    float lr_decay = 15;
+    float lr_decay_freq = 16;
     float momentum = 3;
     float dropout = 5;
 

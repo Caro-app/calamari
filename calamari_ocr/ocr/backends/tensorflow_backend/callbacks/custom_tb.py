@@ -69,7 +69,14 @@ class CustomTensorBoard(TensorBoard):
 
     def on_train_begin(self, logs):
         super().on_train_begin(logs)
-        
+
+        if self.histogram_freq:
+            self._log_weights(0)
+
+        if self.embeddings_freq:
+            self._log_embeddings(0)
+
+
         self.iter_start_time = time.time()
         self.train_start_time = time.time()
 
@@ -99,6 +106,7 @@ class CustomTensorBoard(TensorBoard):
             gt_sentence = self.text_post_proc.apply("".join(self.codec.decode(target[0])))
             self._log_metrics({"loss": self.loss_stats.mean()}, prefix='batch_', step=self.checkpoint_params.iter)
             self._log_metrics({"cer": self.ler_stats.mean()}, prefix='batch_', step=self.checkpoint_params.iter)
+            self._log_metrics({"lr": logs['lr']}, prefix='', step=self.checkpoint_params.iter)
 
             self.training_callback.display(self.ler_stats.mean(), self.loss_stats.mean(), self.dt_stats.mean(),
                                         self.checkpoint_params.iter, self.steps_per_epoch, self.display_epochs,

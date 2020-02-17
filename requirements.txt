@@ -8,5 +8,5 @@ lxml
 h5py
 protobuf
 prettytable
-tensorflow
+tensorflow==2.0.0
 yacs
