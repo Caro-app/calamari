@@ -125,6 +125,8 @@ message NetworkParams {
     bool ctc_merge_repeated = 9;
 
     float clipping_norm = 13;
+
+    bool only_last_trainable = 17;
 }
 
 // Backend data

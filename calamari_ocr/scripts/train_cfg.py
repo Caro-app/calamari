@@ -187,6 +187,7 @@ def run(cfg: CfgNode):
     params.model.network.learning_rate = cfg.SOLVER.LR
     params.model.network.lr_decay = cfg.SOLVER.LR_DECAY
     params.model.network.lr_decay_freq = cfg.SOLVER.LR_DECAY_FREQ
+    params.model.network.only_last_trainable = cfg.SOLVER.ONLY_LAST_TRAINABLE
     network_params_from_definition_string(cfg.MODEL.NETWORK, params.model.network)
     params.model.network.clipping_norm = cfg.SOLVER.GRADIENT_CLIPPING_NORM
     params.model.network.backend.num_inter_threads = 0

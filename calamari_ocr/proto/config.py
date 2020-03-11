@@ -98,7 +98,9 @@ _C.MODEL.CODEX.WHITELIST_FILES = []
 # For large datasets you can use this to skip the automatic codec computation
 # (see --no_auto_compute_codec)
 _C.MODEL.CODEX.WHITELIST = []
-# Fully include the codec of the loaded model to the new codec
+# Fully include the codec of the loaded model to the new codec . This option will override the whitelist.
+#  If no codec_changes, the whole model will default to be copied.
+#  If there are codec_changes, the last layer will be set random and previous that will be copy.
 _C.MODEL.CODEX.KEEP_LOADED_CODEC = False
 
 _C.SOLVER = CfgNode()
@@ -130,6 +132,9 @@ _C.SOLVER.GRADIENT_CLIPPING_NORM = 5
 _C.SOLVER.EARLY_STOPPING_FREQ = -1
 # The number of models that must be worse than the current best model to stop
 _C.SOLVER.EARLY_STOPPING_NBEST = 5
+#  Whether only train the last layer (used in transfer learning) or the whole.
+_C.SOLVER.ONLY_LAST_TRAINABLE = False
+
 
 def get_cfg() -> CfgNode:
     """

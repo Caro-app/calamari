@@ -59,6 +59,10 @@ class TensorflowModel(ModelInterface):
 
         print(self.model.summary())
 
+        print('Trainable Status')
+        for l in self.model.layers:
+            print('Layer: {} \t Trainable {}'.format(l.name, l.trainable))
+
     def create_predictor(self):
         return Model(inputs=[
             self.input_data, self.input_length, self.input_params
@@ -265,6 +269,14 @@ class TensorflowModel(ModelInterface):
             return p
 
         model = Model(inputs=[self.targets, self.input_data, self.input_length, self.targets_length], outputs=[loss])
+
+        if self.network_proto.only_last_trainable:
+            for i in model.layers:
+                if i.name == 'logits':
+                    i.trainable = True
+                else:
+                    i.trainable = False
+        
         model.compile(optimizer=optimizer, loss={'ctc': ctc_loss},
                       )
 
