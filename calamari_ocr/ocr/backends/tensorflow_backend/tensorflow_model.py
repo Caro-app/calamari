@@ -274,15 +274,15 @@ class TensorflowModel(ModelInterface):
         trainable_layers = [i.name for i in model.layers if len(i.trainable_weights) > 0]
 
         if self.network_proto.train_last_n_layer:
-            if self.network_proto.train_last_n_layer > len(trainable_layers)
+            if self.network_proto.train_last_n_layer > len(trainable_layers):
                 raise Exception('train_last_n_layer cannot be larger than the no of trainable layers')
-            
+
             trainable_layers_to_freeze = trainable_layers[:train_last_n_layer + 1]
 
             for layer in model.layers:
                 if layer.name in trainable_layers_to_freeze:
                     layer.trainable = False
-        
+
         model.compile(optimizer=optimizer, loss={'ctc': ctc_loss},
                       )
 
