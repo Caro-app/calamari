@@ -126,7 +126,7 @@ message NetworkParams {
 
     float clipping_norm = 13;
 
-    bool only_last_trainable = 17;
+    int32 train_last_n_layer = 17;
 }
 
 // Backend data

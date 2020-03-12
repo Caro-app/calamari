@@ -132,8 +132,8 @@ _C.SOLVER.GRADIENT_CLIPPING_NORM = 5
 _C.SOLVER.EARLY_STOPPING_FREQ = -1
 # The number of models that must be worse than the current best model to stop
 _C.SOLVER.EARLY_STOPPING_NBEST = 5
-#  Whether only train the last layer (used in transfer learning) or the whole.
-_C.SOLVER.ONLY_LAST_TRAINABLE = False
+# First n layer to train (0: (turn off) means train everything, 1: means train last layer, 2: means train last two layers)
+_C.SOLVER.TRAIN_LAST_N_LAYER = 0
 
 
 def get_cfg() -> CfgNode:
