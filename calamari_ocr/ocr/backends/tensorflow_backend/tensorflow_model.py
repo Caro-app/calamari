@@ -277,7 +277,7 @@ class TensorflowModel(ModelInterface):
             if self.network_proto.train_last_n_layer > len(trainable_layers):
                 raise Exception('train_last_n_layer cannot be larger than the no of trainable layers')
 
-            trainable_layers_to_freeze = trainable_layers[:self.network_proto.train_last_n_layer + 1]
+            trainable_layers_to_freeze = trainable_layers[:-self.network_proto.train_last_n_layer]
 
             for layer in model.layers:
                 if layer.name in trainable_layers_to_freeze:
