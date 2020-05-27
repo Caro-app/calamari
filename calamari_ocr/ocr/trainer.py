@@ -11,18 +11,16 @@ import numpy as np
 import bidi.algorithm as bidi
 
 from calamari_ocr.utils import RunningStatistics, checkpoint_path
-
 from calamari_ocr.ocr import Predictor, Evaluator
-
 from google.protobuf import json_format
-
 from .datasets import InputDataset, StreamingInputDataset
 
+from typing import Union, List
 
 class Trainer:
     def __init__(self, checkpoint_params,
                  dataset,
-                 validation_dataset=None,
+                 validation_dataset: Union[List, None] = None,
                  txt_preproc=None,
                  txt_postproc=None,
                  data_preproc=None,
@@ -57,7 +55,7 @@ class Trainer:
             Proto parameter object that defines all hyperparameters of the model
         dataset : Dataset
             The Dataset used for training
-        validation_dataset : Dataset, optional
+        validation_dataset : List of Dataset, optional
             The Dataset used for validation, i.e. choosing the best model
         txt_preproc : TextProcessor, optional
             Text preprocessor that is applied on loaded text, before the Codec is computed
@@ -91,9 +89,13 @@ class Trainer:
         self.n_augmentations = n_augmentations
         self.dataset = StreamingInputDataset(dataset, self.data_preproc, self.txt_preproc, data_augmenter, n_augmentations,
                                              processes=self.checkpoint_params.processes)
-        self.validation_dataset = StreamingInputDataset(validation_dataset, self.data_preproc, self.txt_preproc,
-                                                        processes=self.checkpoint_params.processes
-                                                        ) if validation_dataset else None
+        if validation_dataset:
+            self.validation_dataset = [StreamingInputDataset(i, self.data_preproc, self.txt_preproc,
+                                                            processes=self.checkpoint_params.processes
+                                                            ) for i in validation_dataset]
+        else:
+            self.validation_dataset = None
+
         self.preload_training = preload_training
         self.preload_validation = preload_validation
 
@@ -126,7 +128,8 @@ class Trainer:
 
             exit_stack.enter_context(self.dataset)
             if self.validation_dataset:
-                exit_stack.enter_context(self.validation_dataset)
+                for valid_data in self.validation_dataset:
+                    exit_stack.enter_context(valid_data)
 
             # load training dataset
             if self.preload_training:
@@ -136,18 +139,23 @@ class Trainer:
                 exit_stack.enter_context(self.dataset)
 
             # load validation dataset
+            validation_dataset_list = []
             if self.validation_dataset and self.preload_validation:
-                new_dataset = self.validation_dataset.to_raw_input_dataset(processes=checkpoint_params.processes, progress_bar=progress_bar)
-                exit_stack.pop(self.validation_dataset)
-                self.validation_dataset = new_dataset
-                exit_stack.enter_context(self.validation_dataset)
+                for valid_data in self.validation_dataset:
+                    new_dataset = valid_data.to_raw_input_dataset(processes=checkpoint_params.processes, progress_bar=progress_bar)
+                    exit_stack.pop(valid_data)
+                    valid_data = new_dataset
+                    exit_stack.enter_context(valid_data)
+                    validation_dataset_list.append(valid_data)
+
+            self.validation_dataset = validation_dataset_list
 
             # compute the codec
             if self.codec:
                 codec = self.codec
             else:
                 if len(self.codec_whitelist) == 0 or auto_compute_codec:
-                    codec = Codec.from_input_dataset([self.dataset, self.validation_dataset],
+                    codec = Codec.from_input_dataset([self.dataset] + [i for i in self.validation_dataset],
                                                      whitelist=self.codec_whitelist, progress_bar=progress_bar)
                 else:
                     codec = Codec.from_texts([], whitelist=self.codec_whitelist)

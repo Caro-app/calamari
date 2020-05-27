@@ -6,18 +6,32 @@ import tensorflow as tf
 import time
 import os
 from calamari_ocr.utils.multiprocessing import tqdm_wrapper
+from calamari_ocr.utils import dataregistry
+from tensorflow.keras.callbacks import TensorBoard
+
 keras = tf.keras
 
 
 class EarlyStoppingCallback(keras.callbacks.Callback):
-    def __init__(self, training_callback,  codec, data_gen, predict_func, checkpoint_params, steps_per_epoch_valid, steps_per_epoch_train, vis_cb, progress_bar):
+    def __init__(self, 
+                 training_callback,
+                 codec, 
+                 data_gen, 
+                 predict_func, 
+                 checkpoint_params, 
+                 steps_per_epoch_train, 
+                 steps_per_epoch_valid_list,
+                 ctb_cb, 
+                 progress_bar):
         self.training_callback = training_callback
         self.codec = codec
+        if not data_gen:
+            raise Exception("data_gen is an empty list")
         self.data_gen = data_gen
         self.predict_func = predict_func
         self.checkpoint_params = checkpoint_params
-        self.steps_per_epoch_valid = steps_per_epoch_valid
-        self.vis_cb = vis_cb
+        self.steps_per_epoch_valid_list = steps_per_epoch_valid_list
+        self.ctb_cb = ctb_cb
         self.progress_bar = progress_bar
 
         checkpoint_frequency = checkpoint_params.checkpoint_frequency
@@ -40,9 +54,9 @@ class EarlyStoppingCallback(keras.callbacks.Callback):
         else:
             checkpoint_frequency = int(checkpoint_frequency)
 
-        self.early_stopping_enabled = self.data_gen is not None \
-                                 and checkpoint_params.early_stopping_frequency != 0 \
-                                 and checkpoint_params.early_stopping_nbest > 1
+        self.early_stopping_enabled = (self.data_gen is not None and
+                                       checkpoint_params.early_stopping_frequency != 0 and
+                                       checkpoint_params.early_stopping_nbest > 1)
         self.early_stopping_best_accuracy = checkpoint_params.early_stopping_best_accuracy
         self.early_stopping_best_cur_nbest = checkpoint_params.early_stopping_best_cur_nbest
         self.early_stopping_best_at_iter = checkpoint_params.early_stopping_best_at_iter
@@ -84,9 +98,9 @@ class EarlyStoppingCallback(keras.callbacks.Callback):
         print("Storing checkpoint to '{}'".format(checkpoint_path))
         self.model.save(checkpoint_path + '.h5', overwrite=True)
         checkpoint_params.version = Checkpoint.VERSION
-        checkpoint_params.loss_stats[:] = self.vis_cb.loss_stats.values
-        checkpoint_params.ler_stats[:] = self.vis_cb.ler_stats.values
-        checkpoint_params.dt_stats[:] = self.vis_cb.dt_stats.values
+        checkpoint_params.loss_stats[:] = self.ctb_cb.loss_stats.values
+        checkpoint_params.ler_stats[:] = self.ctb_cb.ler_stats.values
+        checkpoint_params.dt_stats[:] = self.ctb_cb.dt_stats.values
         checkpoint_params.total_time = time.time() - self.train_start_time
         checkpoint_params.early_stopping_best_accuracy = self.early_stopping_best_accuracy
         checkpoint_params.early_stopping_best_cur_nbest = self.early_stopping_best_cur_nbest
@@ -109,7 +123,8 @@ class EarlyStoppingCallback(keras.callbacks.Callback):
 
         if self.early_stopping_enabled and (iter + 1) % self.early_stopping_frequency == 0:
             print("Checking early stopping model")
-            cer = self._compute_current_cer_on_validation_set(self.steps_per_epoch_valid)
+
+            cer = self._compute_current_cer_on_validation_set_list()
             accuracy = 1 - cer
 
             if accuracy > self.early_stopping_best_accuracy:
@@ -148,10 +163,30 @@ class EarlyStoppingCallback(keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs):
         pass
 
-    def _compute_current_cer_on_validation_set(self, count):
+    def _compute_current_cer_on_validation_set(self, val_data, count, desc):
         def generate_cer():
-            it = iter(self.data_gen)
+            it = iter(val_data)
             for _ in range(count):
                 yield np.mean(self.predict_func(next(it))[0])
 
-        return np.mean([cer for cer in tqdm_wrapper(generate_cer(), total=count, progress_bar=self.progress_bar, desc="Early stopping") if np.isfinite(cer)])
+        return np.mean([cer for cer in tqdm_wrapper(generate_cer(),
+                                                    total=count,
+                                                    progress_bar=self.progress_bar,
+                                                    desc=desc) if np.isfinite(cer)])
+
+    def _compute_current_cer_on_validation_set_list(self):
+        cer_list = []
+        for i, val_data in enumerate(self.data_gen):
+            count = self.steps_per_epoch_valid_list[i]
+            val_data_name = dataregistry.get_name(i)
+            val_cer = self._compute_current_cer_on_validation_set(val_data, count, val_data_name)
+            self.ctb_cb._log_metrics({"cer": val_cer},
+                              prefix=f'{val_data_name}/validation_',
+                              step=self.checkpoint_params.iter)
+            cer_list.append(val_cer)
+
+        overall_val_cer = np.mean(cer_list)
+        self.ctb_cb._log_metrics({"cer": overall_val_cer},
+                          prefix='overall/validation_',
+                          step=self.checkpoint_params.iter)
+        return overall_val_cer

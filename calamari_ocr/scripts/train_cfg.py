@@ -16,6 +16,15 @@ from google.protobuf import json_format
 
 from calamari_ocr.proto.config import get_cfg
 from yacs.config import CfgNode
+from typing import List, Union
+from calamari_ocr.ocr.datasets import RawDataSet
+from calamari_ocr.ocr.datasets import FileDataSet
+from calamari_ocr.ocr.datasets import AbbyyDataSet
+from calamari_ocr.ocr.datasets import PageXMLDataset
+from calamari_ocr.ocr.datasets.hdf5_dataset import Hdf5DataSet
+from calamari_ocr.ocr.datasets.extended_prediction_dataset import ExtendedPredictionDataSet
+from calamari_ocr.ocr.datasets.generated_line_dataset import GeneratedLineDataset
+from calamari_ocr.utils import dataregistry
 
 
 def create_train_dataset(cfg: CfgNode, dataset_args=None):
@@ -50,6 +59,51 @@ def create_train_dataset(cfg: CfgNode, dataset_args=None):
     print("Found {} files in the dataset".format(len(dataset)))
     return dataset
 
+
+def create_test_dataset(cfg: CfgNode,
+                        dataset_args=None) -> Union[List[
+                                                    Union[RawDataSet, FileDataSet,
+                                                    AbbyyDataSet, PageXMLDataset,
+                                                    Hdf5DataSet, ExtendedPredictionDataSet,
+                                                    GeneratedLineDataset]], None]:
+    if cfg.DATASET.VALID.TEXT_FILES:
+        assert len(cfg.DATASET.VALID.PATH) == len(cfg.DATASET.VALID.TEXT_FILES)
+
+    if cfg.DATASET.VALID.PATH:
+        validation_dataset_list = []
+        print("Resolving validation files")
+        for i, valid_path in enumerate(cfg.DATASET.VALID.PATH):
+            validation_image_files = glob_all(valid_path)
+            dataregistry.register(i,
+                                  os.path.basename(os.path.dirname(valid_path)),
+                                  len(validation_image_files))
+
+            if not cfg.DATASET.VALID.TEXT_FILES:
+                val_txt_files = [split_all_ext(f)[0] + cfg.DATASET.VALID.GT_EXTENSION for f in validation_image_files]
+            else:
+                val_txt_files = sorted(glob_all(cfg.DATASET.VALID.TEXT_FILES[i]))
+                validation_image_files, val_txt_files = keep_files_with_same_file_name(validation_image_files, val_txt_files)
+                for img, gt in zip(validation_image_files, val_txt_files):
+                    if split_all_ext(os.path.basename(img))[0] != split_all_ext(os.path.basename(gt))[0]:
+                        raise Exception("Expected identical basenames of validation file: {} and {}".format(img, gt))
+
+            if len(set(val_txt_files)) != len(val_txt_files):
+                raise Exception("Some validation images are occurring more than once in the data set.")
+
+            validation_dataset = create_dataset(
+                cfg.DATASET.VALID.TYPE,
+                DataSetMode.TRAIN,
+                images=validation_image_files,
+                texts=val_txt_files,
+                skip_invalid=not cfg.DATALOADER.NO_SKIP_INVALID_GT,
+                args=dataset_args,
+            )
+            print("Found {} files in the validation dataset".format(len(validation_dataset)))
+            validation_dataset_list.append(validation_dataset)
+    else:
+        validation_dataset_list = None
+
+    return validation_dataset_list
 
 def run(cfg: CfgNode):
 
@@ -96,32 +150,7 @@ def run(cfg: CfgNode):
     dataset = create_train_dataset(cfg, dataset_args)
 
     # Validation dataset
-    if cfg.DATASET.VALID.PATH:
-        print("Resolving validation files")
-        validation_image_files = glob_all(cfg.DATASET.VALID.PATH)
-        if not cfg.DATASET.VALID.TEXT_FILES:
-            val_txt_files = [split_all_ext(f)[0] + cfg.DATASET.VALID.GT_EXTENSION for f in validation_image_files]
-        else:
-            val_txt_files = sorted(glob_all(cfg.DATASET.VALID.TEXT_FILES))
-            validation_image_files, val_txt_files = keep_files_with_same_file_name(validation_image_files, val_txt_files)
-            for img, gt in zip(validation_image_files, val_txt_files):
-                if split_all_ext(os.path.basename(img))[0] != split_all_ext(os.path.basename(gt))[0]:
-                    raise Exception("Expected identical basenames of validation file: {} and {}".format(img, gt))
-
-        if len(set(val_txt_files)) != len(val_txt_files):
-            raise Exception("Some validation images are occurring more than once in the data set.")
-
-        validation_dataset = create_dataset(
-            cfg.DATASET.VALID.TYPE,
-            DataSetMode.TRAIN,
-            images=validation_image_files,
-            texts=val_txt_files,
-            skip_invalid=not cfg.DATALOADER.NO_SKIP_INVALID_GT,
-            args=dataset_args,
-        )
-        print("Found {} files in the validation dataset".format(len(validation_dataset)))
-    else:
-        validation_dataset = None
+    validation_dataset_list = create_test_dataset(cfg, dataset_args)
 
     params = CheckpointParams()
 
@@ -202,7 +231,7 @@ def run(cfg: CfgNode):
     # create the actual trainer
     trainer = Trainer(params,
                       dataset,
-                      validation_dataset=validation_dataset,
+                      validation_dataset=validation_dataset_list,
                       data_augmenter=SimpleDataAugmenter(),
                       n_augmentations=cfg.INPUT.N_AUGMENT,
                       weights=weights,
