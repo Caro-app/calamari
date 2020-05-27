@@ -14,6 +14,7 @@ from .callbacks.earlystopping import EarlyStoppingCallback
 from .callbacks import CustomTensorBoard,  LearningRateScheduler
 import os
 
+
 keras = tf.keras
 K = keras.backend
 KL = keras.layers
@@ -328,8 +329,15 @@ class TensorflowModel(ModelInterface):
     def train(self, dataset, validation_dataset, checkpoint_params, text_post_proc, progress_bar,
               training_callback=TrainingCallback()):
         dataset_gen = self.create_dataset_inputs(dataset, self.batch_size, self.network_proto.features, self.network_proto.backend.shuffle_buffer_size)
+
         if validation_dataset:
-            val_dataset_gen = self.create_dataset_inputs(validation_dataset, self.batch_size, self.network_proto.features, self.network_proto.backend.shuffle_buffer_size, mode='test')
+            val_dataset_gen = [self.create_dataset_inputs(i,
+                                                          self.batch_size,
+                                                          self.network_proto.features,
+                                                          self.network_proto.backend.shuffle_buffer_size,
+                                                          mode='test') 
+                               for i in validation_dataset]
+            val_dataset_gen = tuple(val_dataset_gen)
         else:
             val_dataset_gen = None
 
@@ -348,6 +356,11 @@ class TensorflowModel(ModelInterface):
 
         lrs_cb = LearningRateScheduler(lr_schedule, verbose=1)
 
+        steps_per_epoch_valid_list = []
+        for valid_data in validation_dataset:
+            steps_per_epoch_valid_list.append(max(1, int(np.ceil(valid_data.epoch_size() / checkpoint_params.batch_size))))
+        steps_per_epoch_valid_list = tuple(steps_per_epoch_valid_list)
+
         ctb_cb = CustomTensorBoard(training_callback,
                                  self.codec, 
                                  dataset_gen, 
@@ -361,9 +374,16 @@ class TensorflowModel(ModelInterface):
                                  update_freq='batch',
                                  log_dir=os.path.join(checkpoint_params.output_dir)
                                  )
-        es_cb = EarlyStoppingCallback(training_callback, self.codec, val_dataset_gen, predict_func, checkpoint_params,
-                                      0 if not validation_dataset else max(1, int(np.ceil(validation_dataset.epoch_size() / checkpoint_params.batch_size))),
-                                      steps_per_epoch, ctb_cb, progress_bar)
+
+        es_cb = EarlyStoppingCallback(training_callback, 
+                                      self.codec, 
+                                      val_dataset_gen,
+                                      predict_func, 
+                                      checkpoint_params,
+                                      steps_per_epoch,
+                                      steps_per_epoch_valid_list,
+                                      ctb_cb, 
+                                      progress_bar)
 
         self.model.fit(
             dataset_gen,
@@ -372,7 +392,7 @@ class TensorflowModel(ModelInterface):
             use_multiprocessing=False,
             shuffle=False,
             verbose=0,
-            validation_data=val_dataset_gen,
+            validation_data=None,
             callbacks=[
                 lrs_cb, ctb_cb, es_cb
             ]
