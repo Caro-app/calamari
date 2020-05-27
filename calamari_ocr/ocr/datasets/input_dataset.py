@@ -12,7 +12,6 @@ from abc import ABC, abstractmethod
 import logging
 
 from .queue_helper import MaxElementsQueuer
-from ..augmentation.dataaugmentationparams import DataAugmentationAmount, DataAugmentationAmountReference
 
 logger = logging.getLogger(__name__)
 
